@@ -20,12 +20,13 @@ PACKAGE_CACHE="/root/opkg_reinstall_after_fw_upgrade/packages"
 #
 # Runtime vars
 INSTALL_ONLINE="1"
+MINIMUM_UPTIME_IN_SECONDS="120"
 REBOOT_REQUIRED="1"
 PKG_TO_REMOVE=""
-PKG_TO_INSTALL="luci-app-commands ddns-scripts luci-app-ddns luci-ssl-openssl ipset wireguard luci-app-wireguard"
+PKG_TO_INSTALL="luci-proto-wireguard kmod-wireguard wireguard-tools"
 #
 # Replace ct with non-ct WiFi drivers to fix stability issues, necessary f.e. on TP-Link Archer C7 devices.
-INSTALL_NON_CT_WIFI_DRIVERS="1"
+INSTALL_NON_CT_WIFI_DRIVERS="0"
 #
 #
 #
@@ -56,8 +57,8 @@ waitForInternetConnection () {
     #
     # Give WiFi mesh interface time to connect and get internet connectivity.
     logAdd "[INFO] Waiting for WiFi to initialize"
-    UPTIME_IN_SECONDS="$(cat /proc/uptime | cut -d "." -f 1)"
-    SECONDS_TO_SLEEP="$((120-${UPTIME_IN_SECONDS}))"
+    CURRENT_UPTIME_IN_SECONDS="$(cat /proc/uptime | cut -d "." -f 1)"
+    SECONDS_TO_SLEEP="$((${MINIMUM_UPTIME_IN_SECONDS}-${CURRENT_UPTIME_IN_SECONDS}))"
     sleep "${SECONDS_TO_SLEEP}"
     #
     return 0
@@ -142,8 +143,14 @@ runInstall () {
     #
     # If we are online, update the package cache.
     if [ "${INSTALL_ONLINE}" = "1" ]; then
+        logAdd "[INFO] Synchronizing time to make certificate validation work ..."
+		/usr/sbin/ntpd -p 0.openwrt.pool.ntp.org -nq 2>&1
         logAdd "[INFO] Downloading package information ..."
-        RESULT="$(opkg update | grep "http://" 2>&1)"
+        RESULT="$(opkg update 2>&1)"
+        if ( echo "${RESULT}" | grep -q "Failed to download"); then
+			logAdd "[ERROR] opkg update: - ${RESULT}"
+            return 1
+        fi
         logAdd "[INFO] opkg update: - ${RESULT}"
     fi
     #
