@@ -3,7 +3,7 @@ trap "" SIGHUP
 #
 #
 # Command line
-## sh /root/opkg_reinstall_after_fw_upgrade/opkg_reinstall.sh force
+## sh /root/apk_reinstall_after_fw_upgrade/apk_reinstall.sh force
 #
 # Notes
 ## This script automatically removes and install packages defined in vars after a firmware upgrade.
@@ -11,12 +11,12 @@ trap "" SIGHUP
 # Consts
 PATH=/usr/bin:/usr/sbin:/sbin:/bin
 #
-# Note: If we log to "/root/" during "insmod", "opkg", "rmmod" commands affecting kernel modules, the kernel will panic and the device will reboot.
-LOGFILE="/root/opkg_reinstall_after_fw_upgrade/opkg_reinstall.log"
+# Note: If we log to "/root/" during "insmod", "apk", "rmmod" commands affecting kernel modules, the kernel will panic and the device will reboot.
+LOGFILE="/root/apk_reinstall_after_fw_upgrade/apk_reinstall.log"
 LOG_MAX_LINES="1000"
 #
 LOG_COLLECTOR_HOSTNAME="OWRT-ROUTER"
-PACKAGE_CACHE="/root/opkg_reinstall_after_fw_upgrade/packages"
+PACKAGE_CACHE="/root/apk_reinstall_after_fw_upgrade/packages"
 #
 # Runtime vars
 INSTALL_ONLINE="1"
@@ -65,19 +65,19 @@ waitForInternetConnection () {
 }
 
 
-opkgRemove () {
+apkRemove () {
     # Syntax:
-    #   opkgRemove "[PACKAGE_NAME]"
+    #   apkRemove "[PACKAGE_NAME]"
     #
     for package_name in $@; do
-        logAdd "[INFO] opkgRemove: Removing ${package_name}"
-        RESULT="$(eval "opkg remove ${package_name}" 2>&1)"
+        logAdd "[INFO] apkRemove: Removing ${package_name}"
+        RESULT="$(eval "apk del ${package_name}" 2>&1)"
         if ( echo "${package_name}" | grep -q "^kmod-" ); then
             REBOOT_REQUIRED="1"
-            # logAdd "[INFO] opkgRemove: Kernel module removed. Will sleep a bit to avoid crash."
+            # logAdd "[INFO] apkRemove: Kernel module removed. Will sleep a bit to avoid crash."
             sleep 10
         fi
-        logAdd "[INFO] opkgRemove: - ${RESULT}"
+        logAdd "[INFO] apkRemove: - ${RESULT}"
         if ( echo "${RESULT}" | grep -q "Collected errors:"); then
             return 1
         fi
@@ -86,14 +86,14 @@ opkgRemove () {
 }
 
 
-opkgInstall () {
+apkInstall () {
     # Syntax:
-    #   opkgInstall "[PACKAGE_NAME]"
+    #   apkInstall "[PACKAGE_NAME]"
     #
     # Online mode.
     if [ "${INSTALL_ONLINE}" = "1" ]; then
-        RESULT="$(eval "opkg install ${@}" 2>&1)"
-        logAdd "[INFO] opkgInstall: - ${RESULT}"
+        RESULT="$(eval "apk add ${@}" 2>&1)"
+        logAdd "[INFO] apkInstall: - ${RESULT}"
         if ( echo "${RESULT}" | grep -q "Collected errors:"); then
             return 1
         fi
@@ -104,7 +104,7 @@ opkgInstall () {
     IPKG_FULLFN=""
     for package_name in $@; do
         if ( ! ls -1 ${PACKAGE_CACHE} | grep -q "^${package_name}_" ); then
-            logAdd "[ERROR] opkgInstall: Package missing in cache - [${package_name}]"
+            logAdd "[ERROR] apkInstall: Package missing in cache - [${package_name}]"
             continue
         fi
         IPKG_FULLFN="${IPKG_FULLFN} ${PACKAGE_CACHE}/$(ls -1 ${PACKAGE_CACHE} | grep "^${package_name}_")"
@@ -112,13 +112,13 @@ opkgInstall () {
     if [ -z "${IPKG_FULLFN}" ]; then
         return 0
     fi
-    RESULT="$(eval "opkg --cache ${PACKAGE_CACHE} install ${IPKG_FULLFN}" 2>&1)"
+    RESULT="$(eval "apk --cache ${PACKAGE_CACHE} add ${IPKG_FULLFN}" 2>&1)"
     if ( echo "${*}" | grep -q "kmod-" ); then
         REBOOT_REQUIRED="1"
-        # logAdd "[INFO] opkgInstall: Kernel module added. Will sleep a bit to avoid crash."
+        # logAdd "[INFO] apkInstall: Kernel module added. Will sleep a bit to avoid crash."
         sleep 10
     fi
-    logAdd "[INFO] opkgInstall: - ${RESULT}"
+    logAdd "[INFO] apkInstall: - ${RESULT}"
     if ( echo "${RESULT}" | grep -q "Collected errors:"); then
         return 1
     fi
@@ -146,12 +146,12 @@ runInstall () {
         logAdd "[INFO] Synchronizing time to make certificate validation work ..."
 		/usr/sbin/ntpd -p 0.openwrt.pool.ntp.org -nq 2>&1
         logAdd "[INFO] Downloading package information ..."
-        RESULT="$(opkg update 2>&1)"
+        RESULT="$(apk update 2>&1)"
         if ( echo "${RESULT}" | grep -q "Failed to download"); then
-			logAdd "[ERROR] opkg update: - ${RESULT}"
+			logAdd "[ERROR] apk update: - ${RESULT}"
             return 1
         fi
-        logAdd "[INFO] opkg update: - ${RESULT}"
+        logAdd "[INFO] apk update: - ${RESULT}"
     fi
     #
     # Replace ct with non-ct WiFi drivers
@@ -163,14 +163,14 @@ runInstall () {
     #
     # Remove defined packages
     logAdd "[INFO] runInstall: Remove packages"
-    opkgRemove "${PKG_TO_REMOVE}"
+    apkRemove "${PKG_TO_REMOVE}"
     if [ ! "$?" = "0" ]; then
         return $?
     fi
     #
     # Install defined packages
     logAdd "[INFO] runInstall: Install packages"
-    opkgInstall "${PKG_TO_INSTALL}"
+    apkInstall "${PKG_TO_INSTALL}"
     if [ ! "$?" = "0" ]; then
         return $?
     fi
@@ -189,8 +189,8 @@ if ( echo "${*}" | grep -q "force" ); then
 fi
 #
 # Check if the script should run on boot.
-if [ -f "/etc/_OPKG_REINSTALL_COMPLETE" ]; then
-    echo "[INFO] /etc/_OPKG_REINSTALL_COMPLETE exists."
+if [ -f "/etc/_APK_REINSTALL_COMPLETE" ]; then
+    echo "[INFO] /etc/_APK_REINSTALL_COMPLETE exists."
     exit 99
 fi
 #
@@ -207,7 +207,7 @@ if [ ! "$?" = "0" ]; then
     logAdd "[ERROR] One or more packages FAILED to install"
 else
     logAdd "[INFO] All packages installed successfully"
-    touch "/etc/_OPKG_REINSTALL_COMPLETE"
+    touch "/etc/_APK_REINSTALL_COMPLETE"
 fi
 #
 logAdd "[INFO] Cleanup"

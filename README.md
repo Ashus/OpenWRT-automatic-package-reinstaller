@@ -4,13 +4,13 @@ This script reinstalls critical packages after you upgrade your OpenWRT so you c
 # Installation
 
 ## 01  Upload the script
-- place script in /root/opkg_reinstall_after_fw_upgrade/opkg_reinstall.sh
+- place script in /root/apk_reinstall_after_fw_upgrade/apk_reinstall.sh
 
 ## 02  Let the script know to not launch with current system and add execute bit
  -run in terminal:
 ```
-touch "/etc/_OPKG_REINSTALL_COMPLETE"
-chmod 0755 /root/opkg_reinstall_after_fw_upgrade/opkg_reinstall.sh
+touch "/etc/_APK_REINSTALL_COMPLETE"
+chmod 0755 /root/apk_reinstall_after_fw_upgrade/apk_reinstall.sh
 ```
 
 ## 03  Edit /etc/sysupgrade.conf
@@ -31,7 +31,7 @@ chmod 0755 /root/opkg_reinstall_after_fw_upgrade/opkg_reinstall.sh
 # Put your custom commands here that should be executed once
 # the system init finished. By default this file does nothing.
 
-( /bin/sleep 30; /bin/sh /root/opkg_reinstall_after_fw_upgrade/opkg_reinstall.sh ) &
+( /bin/sleep 30; /bin/sh /root/apk_reinstall_after_fw_upgrade/apk_reinstall.sh ) &
 
 exit 0
 ```
